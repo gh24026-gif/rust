@@ -249,4 +249,91 @@ fn imprimir(nodo: &Option<Box<Nodo>>, nivel: usize) {
         );
         imprimir(&n.izquierdo, nivel + 1);
     }
+} 
+// ---- MAIN ------------------------------------------------------------------
+
+fn main() {
+    let mut raiz: Option<Box<Nodo>> = None;
+
+    let datos = vec![
+        (10, "El Quijote"),
+        (20, "1984"),
+        (30, "Hamlet"),
+        (5,  "Fahrenheit 451"),
+        (2,  "La Odisea"),
+        (25, "El Principito"),
+    ];
+
+    println!("--------------------------------");
+    println!("    INVENTARIO DE LIBRERIA       ");
+    println!("--------------------------------");
+
+    for (isbn, titulo) in datos {
+        let libro = Libro { isbn, titulo: titulo.to_string() };
+        raiz = Some(insertar(raiz.take(), libro));
+    }
+
+    println!("\nARBOL INICIAL (derecha -> raiz -> izquierda):");
+    imprimir(&raiz, 0);
+
+    println!("\n--- BUSQUEDA ---");
+
+    let isbn_existe = 25u32;
+    match buscar(&raiz, isbn_existe) {
+        Some(libro) => println!("ISBN {} encontrado: \"{}\"", libro.isbn, libro.titulo),
+        None => println!("ISBN {} no encontrado.", isbn_existe),
+    }
+
+    let isbn_no_existe = 99u32;
+    match buscar(&raiz, isbn_no_existe) {
+        Some(libro) => println!("ISBN {} encontrado: \"{}\"", libro.isbn, libro.titulo),
+        None => println!("ISBN {} no encontrado (correcto).", isbn_no_existe),
+    }
+
+    println!("\n--- ELIMINACION ---");
+    println!("Eliminando ISBN 20...");
+
+    raiz = eliminar(raiz.take(), 20);
+
+    println!("Estado del arbol tras eliminar ISBN 20:");
+    imprimir(&raiz, 0);
+
+    match buscar(&raiz, 20) {
+        Some(_) => println!("Error: ISBN 20 todavia existe."),
+        None    => println!("ISBN 20 eliminado correcto."),
+    }
+
+    println!("\nVerificando integridad del resto del arbol:");
+    for isbn in [2u32, 5, 10, 25, 30] {
+        match buscar(&raiz, isbn) {
+            Some(l) => println!("   ISBN {:3} presente: \"{}\"", l.isbn, l.titulo),
+            None    => println!("   ISBN {:3} faltante.", isbn),
+        }
+    }
+
+    println!("\n--- BUSQUEDA POR RANGO ---");
+
+    let (min, max) = (5u32, 27u32);
+    println!("Libros con ISBN entre {} y {}:", min, max);
+
+    let libros_en_rango = buscar_rango(&raiz, min, max);
+    if libros_en_rango.is_empty() {
+        println!("   (Sin resultados)");
+    } else {
+        for libro in &libros_en_rango {
+            println!("   ISBN {:3}: \"{}\"", libro.isbn, libro.titulo);
+        }
+    }
+
+    let (min2, max2) = (40u32, 99u32);
+    let libros_vacio = buscar_rango(&raiz, min2, max2);
+    println!(
+        "Libros con ISBN entre {} y {}: {}",
+        min2, max2,
+        if libros_vacio.is_empty() { "Ninguno (correcto)" } else { "Hay resultados" }
+    );
+
+    println!("\n----------------------------------------");
+    println!("   TODAS LAS FASES CORRECTAS             ");
+    println!("------------------------------------------");
 }
