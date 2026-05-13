@@ -111,3 +111,142 @@ fn insertar(nodo_opt: Option<Box<Nodo>>, libro: Libro) -> Box<Nodo> {
         None => return Box::new(Nodo::nuevo(libro)),
         Some(n) => n,
     };
+    
+    let isbn_nuevo = libro.isbn;
+    if isbn_nuevo < nodo.libro.isbn {
+        nodo.izquierdo = Some(insertar(nodo.izquierdo.take(), libro));
+    } else if isbn_nuevo > nodo.libro.isbn {
+        nodo.derecho = Some(insertar(nodo.derecho.take(), libro));
+    } else {
+        return nodo;
+    }
+
+    actualizar_altura(&mut nodo);
+    rebalancear(nodo, isbn_nuevo, None)
+}
+
+// ---- FASE 2: Búsqueda ------------------------------------------------------
+
+fn buscar(nodo: &Option<Box<Nodo>>, isbn: u32) -> Option<&Libro> {
+    let mut actual = nodo;
+    loop {
+        match actual {
+            None => return None,
+            Some(n) => {
+                if isbn == n.libro.isbn {
+                    return Some(&n.libro);
+                } else if isbn < n.libro.isbn {
+                    actual = &n.izquierdo;
+                } else {
+                    actual = &n.derecho;
+                }
+            }
+        }
+    }
+}
+
+// ---- FASE 3: Eliminación ---------------------------------------------------
+
+fn extraer_minimo(mut nodo: Box<Nodo>) -> (Option<Box<Nodo>>, Box<Nodo>) {
+    if nodo.izquierdo.is_none() {
+        let derecho = nodo.derecho.take();
+        return (derecho, nodo);
+    }
+    let (nuevo_izq, minimo) = extraer_minimo(nodo.izquierdo.take().unwrap());
+    nodo.izquierdo = nuevo_izq;
+    actualizar_altura(&mut nodo);
+    let nodo = rebalancear(nodo, minimo.libro.isbn, None);
+    (Some(nodo), minimo)
+}
+
+fn eliminar(nodo_opt: Option<Box<Nodo>>, isbn: u32) -> Option<Box<Nodo>> {
+    let mut nodo = match nodo_opt {
+        None => return None,
+        Some(n) => n,
+    };
+
+    if isbn < nodo.libro.isbn {
+        nodo.izquierdo = eliminar(nodo.izquierdo.take(), isbn);
+    } else if isbn > nodo.libro.isbn {
+        nodo.derecho = eliminar(nodo.derecho.take(), isbn);
+    } else {
+        match (nodo.izquierdo.take(), nodo.derecho.take()) {
+            (None, None) => return None,
+            (None, Some(der)) => return Some(der),
+            (Some(izq), None) => return Some(izq),
+            (Some(izq), Some(der)) => {
+                let (nuevo_der, mut sucesor) = extraer_minimo(der);
+                sucesor.izquierdo = Some(izq);
+                sucesor.derecho = nuevo_der;
+                actualizar_altura(&mut sucesor);
+                let isbn_sucesor = sucesor.libro.isbn;
+                return Some(rebalancear(sucesor, isbn_sucesor, None));
+            }
+        }
+    }
+
+    actualizar_altura(&mut nodo);
+    Some(rebalancear(nodo, isbn, None))
+}
+
+// ---- FASE 4: Rango ---------------------------------------------------------
+
+fn buscar_rango<'a>(nodo: &'a Option<Box<Nodo>>, min: u32, max: u32) -> Vec<&'a Libro> {
+    let mut resultado = Vec::new();
+    buscar_rango_helper(nodo, min, max, &mut resultado);
+    resultado
+}
+
+fn buscar_rango_helper<'a>(
+    nodo: &'a Option<Box<Nodo>>,
+    min: u32,
+    max: u32,
+    resultado: &mut Vec<&'a Libro>,
+) {
+    if let Some(n) = nodo {
+        if n.libro.isbn > min {
+            buscar_rango_helper(&n.izquierdo, min, max, resultado);
+        }
+        if n.libro.isbn >= min && n.libro.isbn <= max {
+            resultado.push(&n.libro);
+        }
+        if n.libro.isbn < max {
+            buscar_rango_helper(&n.derecho, min, max, resultado);
+        }
+    }
+}
+fn rebalancear(mut nodo: Box<Nodo>, isbn_ref: u32, _isbn_eliminado: Option<u32>) -> Box<Nodo> {
+    let balance = obtener_balance(&nodo);
+
+    if balance > 1 && isbn_ref < nodo.izquierdo.as_ref().unwrap().libro.isbn {
+        return rotar_derecha(nodo);
+    }
+    if balance < -1 && isbn_ref > nodo.derecho.as_ref().unwrap().libro.isbn {
+        return rotar_izquierda(nodo);
+    }
+    if balance > 1 && isbn_ref > nodo.izquierdo.as_ref().unwrap().libro.isbn {
+        let hijo_izq = nodo.izquierdo.take().unwrap();
+        nodo.izquierdo = Some(rotar_izquierda(hijo_izq));
+        return rotar_derecha(nodo);
+    }
+    if balance < -1 && isbn_ref < nodo.derecho.as_ref().unwrap().libro.isbn {
+        let hijo_der = nodo.derecho.take().unwrap();
+        nodo.derecho = Some(rotar_derecha(hijo_der));
+        return rotar_izquierda(nodo);
+    }
+    nodo
+}
+
+fn imprimir(nodo: &Option<Box<Nodo>>, nivel: usize) {
+    if let Some(n) = nodo {
+        imprimir(&n.derecho, nivel + 1);
+        println!(
+            "{:indent$}[ISBN: {:3}] {}",
+            "",
+            n.libro.isbn,
+            n.libro.titulo,
+            indent = nivel * 4
+        );
+        imprimir(&n.izquierdo, nivel + 1);
+    }
+}
